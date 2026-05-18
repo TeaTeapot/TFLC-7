@@ -20,28 +20,6 @@
 5. Проанализировать результат и ответить на контрольные вопросы
 6. Выполнить индивидуальное задание
 
-### Индивидуальное задание — Цикл `while`
-
-**Исходный код (`while.c`):**
-
-```c
-int main() {
-    int i = 0, sum = 0;
-    while (i < 10) {
-        sum += i;
-        i++;
-    }
-    return sum;
-}
-```
-
-**Задания:**
-1. Построить IR для `-O0`
-2. Применить `-indvars`, `-licm`, `-loop-unroll`
-3. Построить CFG
-4. Указать, в чём отличие `while` от `do-while` в IR
-
----
 
 ## Общая часть работы
 
@@ -76,6 +54,9 @@ int main() {
 clang -Xclang -ast-dump -fsyntax-only main.c
 ```
 
+<img width="1210" height="773" alt="02" src="https://github.com/user-attachments/assets/3c3424bf-3057-4e25-9ebe-ff304d6552e2" />
+
+
 AST отображает полное синтаксическое дерево: `FunctionDecl` для `square` и `main`, узлы `BinaryOperator` для умножения, `CallExpr` для вызова `square(a)` и `printf`.
 
 ### 1.4 Генерация LLVM IR
@@ -95,6 +76,15 @@ clang -O2 -S -emit-llvm main.c -o main_O2.ll
 - Все `alloca`/`load`/`store` удалены (`-mem2reg`, `-dce`)
 - Осталось только `printf(25)`
 
+<img width="952" height="799" alt="03" src="https://github.com/user-attachments/assets/52a0503b-6f7e-4fc9-b0ea-e174269a5447" />
+
+<img width="952" height="799" alt="04" src="https://github.com/user-attachments/assets/2fb034fe-96f5-4b56-a656-97bc0f67ee1b" />
+
+<img width="1210" height="773" alt="05" src="https://github.com/user-attachments/assets/cbad6e7c-c95b-4f2b-beb5-ce8378e8092e" />
+
+<img width="1025" height="817" alt="06" src="https://github.com/user-attachments/assets/a261cbe4-24b4-4ec1-9375-69d68d213e43" />
+
+
 ### 1.5 Оптимизация IR и CFG
 
 ```bash
@@ -102,11 +92,40 @@ opt-18 --passes="dot-cfg" -disable-output main_O2.ll
 dot -Tpng .main.dot -o cfg_main.png
 ```
 
+<img width="1210" height="773" alt="08" src="https://github.com/user-attachments/assets/3b89f42f-d13a-4dd9-be5f-934ea532f91c" />
+
+
 После `-O2` функция `main` содержит единственный базовый блок. Функция `square` исчезла полностью.
+
+<img width="1280" height="800" alt="09" src="https://github.com/user-attachments/assets/5e1b3a0e-ba79-4438-959a-2220518052d4" />
+
+<img width="1280" height="800" alt="010" src="https://github.com/user-attachments/assets/1812a25d-3e50-488f-a3f2-65afe0b7f2a5" />
+
 
 ---
 
 ## Индивидуальная часть работы — Цикл `while`
+
+**Исходный код (`while.c`):**
+
+```c
+int main() {
+    int i = 0, sum = 0;
+    while (i < 10) {
+        sum += i;
+        i++;
+    }
+    return sum;
+}
+```
+
+**Задания:**
+1. Построить IR для `-O0`
+2. Применить `-indvars`, `-licm`, `-loop-unroll`
+3. Построить CFG
+4. Указать, в чём отличие `while` от `do-while` в IR
+
+---
 
 ### Задание 1. IR для -O0
 
@@ -114,38 +133,10 @@ dot -Tpng .main.dot -o cfg_main.png
 clang -O0 -S -emit-llvm while.c -o while_O0.ll
 ```
 
-**Файл `while_O0.ll`:**
+<img width="1210" height="773" alt="3" src="https://github.com/user-attachments/assets/3883cdf8-a106-4e4b-99c1-be4c8bbe05e3" />
 
-```llvm
-define dso_local i32 @main() #0 {
-  %1 = alloca i32, align 4    ; возвращаемое значение
-  %2 = alloca i32, align 4    ; переменная i
-  %3 = alloca i32, align 4    ; переменная sum
-  store i32 0, ptr %1, align 4
-  store i32 0, ptr %2, align 4
-  store i32 0, ptr %3, align 4
-  br label %4
+<img width="1210" height="773" alt="4" src="https://github.com/user-attachments/assets/4c93ea78-7a2f-43f9-a033-99c96ca89dbe" />
 
-4:                              ; заголовок цикла (header)
-  %5 = load i32, ptr %2, align 4
-  %6 = icmp slt i32 %5, 10    ; проверка условия i < 10
-  br i1 %6, label %7, label %13  ; TRUE → тело, FALSE → выход
-
-7:                              ; тело цикла (body)
-  %8 = load i32, ptr %2, align 4
-  %9 = load i32, ptr %3, align 4
-  %10 = add nsw i32 %9, %8   ; sum += i
-  store i32 %10, ptr %3, align 4
-  %11 = load i32, ptr %2, align 4
-  %12 = add nsw i32 %11, 1   ; i++
-  store i32 %12, ptr %2, align 4
-  br label %4                 ; назад к заголовку
-
-13:                             ; выход из цикла (exit)
-  %14 = load i32, ptr %3, align 4
-  ret i32 %14
-}
-```
 
 **Ключевые наблюдения при `-O0`:**
 - 3 блока: `entry` → `header(4)` → `body(7)` → `exit(13)`
@@ -165,28 +156,14 @@ sed 's/optnone //' while_O0.ll > while_no_optnone.ll
 #### Шаг 1: mem2reg (SSA-перевод — основа для остальных проходов)
 
 ```bash
-opt-18 --passes="mem2reg" while_no_optnone.ll -S -o while_mem2reg.ll
+opt-14 --passes="mem2reg" while_no_optnone.ll -S -o while_mem2reg.ll
 ```
+<img width="1210" height="773" alt="6" src="https://github.com/user-attachments/assets/932026bd-6e22-4470-ae3d-7978f388c43f" />
 
-```llvm
-define dso_local i32 @main() #0 {
-  br label %1
+<img width="1210" height="773" alt="7" src="https://github.com/user-attachments/assets/5f72abe4-2a92-4408-88a5-a4abdc61c787" />
 
-1:                          ; заголовок цикла
-  %.01 = phi i32 [ 0, %0 ], [ %5, %3 ]   ; phi для i
-  %.0  = phi i32 [ 0, %0 ], [ %4, %3 ]   ; phi для sum
-  %2 = icmp slt i32 %.01, 10
-  br i1 %2, label %3, label %6
+<img width="1210" height="773" alt="8" src="https://github.com/user-attachments/assets/f3f698b7-cff5-4214-a053-3cdd8447ed3e" />
 
-3:                          ; тело цикла
-  %4 = add nsw i32 %.0, %.01  ; sum += i
-  %5 = add nsw i32 %.01, 1    ; i++
-  br label %1
-
-6:                          ; выход
-  ret i32 %.0
-}
-```
 
 После `mem2reg` переменные переведены в SSA-форму: исчезли `alloca`/`load`/`store`, появились `phi`-узлы.
 
@@ -196,56 +173,35 @@ define dso_local i32 @main() #0 {
 opt-18 --passes="mem2reg,indvars" while_no_optnone.ll -S -o while_indvars.ll
 ```
 
-```llvm
-define dso_local i32 @main() #0 {
-  br label %1
-
-1:                          ; заголовок
-  %.01 = phi i32 [ 0, %0 ], [ %3, %2 ]
-  br i1 false, label %2, label %4   ; ← условие вычислено статически!
-
-2:                          ; тело (недостижимо)
-  %3 = add nuw nsw i32 %.01, 1
-  br label %1
-
-4:                          ; выход
-  ret i32 45                 ; ← результат вычислен на этапе компиляции!
-}
-```
 
 `-indvars` распознал `i` как индукционную переменную с диапазоном `[0, 10)` и вычислил значение `sum = 0+1+...+9 = 45` на этапе компиляции.
 
 #### Шаг 3: licm (вынос инвариантных вычислений из цикла)
 
 ```bash
-opt-18 --passes="function(mem2reg,loop-mssa(licm<allowspeculation>))" \
+opt-14 --passes="function(mem2reg,loop-mssa(licm<allowspeculation>))" \
        while_no_optnone.ll -S -o while_licm.ll
 ```
 
 В данном примере LICM не изменил IR, поскольку тело цикла не содержит инвариантных выражений — все операции зависят от переменной `i`. Пример применения LICM: если бы в цикле было `y = x * 2` (где `x` не меняется), LICM вынес бы это вычисление до цикла.
 
+<img width="740" height="79" alt="9" src="https://github.com/user-attachments/assets/229d5ad0-779a-403a-85d1-c1ca38fcd3ee" />
+
+
 #### Шаг 4: loop-unroll (развёртывание цикла)
 
 ```bash
-opt-18 --passes="mem2reg,loop-unroll" while_no_optnone.ll -S -o while_unroll.ll
+opt-14 --passes="mem2reg,loop-unroll" while_no_optnone.ll -S -o while_unroll.ll
 ```
 
-```llvm
-define dso_local i32 @main() #0 {
-  br label %1       ; entry → header (заглушка)
+<img width="1210" height="773" alt="10" src="https://github.com/user-attachments/assets/f4d67a8e-6cb9-4c23-ab7c-6bb904e31923" />
 
-1: br label %2      ; блок развёртки 1: i=0
-2: br label %3      ; блок развёртки 2: i=1
-3: br label %4      ; ...
-...
-11:                 ; итерация 10
-  br i1 false, label %12, label %13
-12: unreachable
-13:
-  %.0.lcssa = phi i32 [ 45, %11 ]
-  ret i32 %.0.lcssa  ; возвращает 45
-}
-```
+<img width="1210" height="773" alt="11" src="https://github.com/user-attachments/assets/36d8507d-2171-4e44-9388-cda025f00438" />
+
+<img width="1280" height="800" alt="12" src="https://github.com/user-attachments/assets/f04d213e-69df-434f-8e01-2e61990a44b7" />
+
+<img width="1280" height="800" alt="13" src="https://github.com/user-attachments/assets/24370930-f6f3-491a-91f0-6d31294216ff" />
+
 
 `-loop-unroll` полностью развернул цикл (10 итераций) и сложил константное выражение.
 
@@ -262,50 +218,24 @@ define dso_local i32 @main() #0 {
 
 ```bash
 # CFG для O0 (с alloca)
-opt-18 --passes="dot-cfg" -disable-output while_O0.ll
+opt-14 --passes="dot-cfg" -disable-output while_O0.ll
 dot -Tpng .main.dot -o while_O0_cfg.png
 
 # CFG после mem2reg (SSA-форма)
-opt-18 --passes="dot-cfg" -disable-output while_mem2reg.ll
+opt-14 --passes="dot-cfg" -disable-output while_mem2reg.ll
 dot -Tpng .main.dot -o while_mem2reg_cfg.png
 
 # CFG после всех оптимизаций
-opt-18 --passes="dot-cfg" -disable-output while_all_passes.ll
+opt-14 --passes="dot-cfg" -disable-output while_all_passes.ll
 dot -Tpng .main.dot -o while_allpasses_cfg.png
 ```
 
-**CFG при `-O0`** (`while_O0_cfg.png`):
+<img width="511" height="402" alt="14" src="https://github.com/user-attachments/assets/0cc973d9-8b26-4cfb-b254-679ced96c552" />
 
-Структура из трёх блоков:
-```
-[entry: alloca, store]
-        ↓
-[header(4): load, icmp i<10, br] ←──┐
-     T ↓          F ↓               │
-[body(7): load,   [exit(13):        │
- add, store, i++]  load, ret]       │
-        └──────────────────────────→┘
-```
+<img width="576" height="615" alt="16" src="https://github.com/user-attachments/assets/33aefeae-1cc0-48b3-8c73-50a68b168cb3" />
 
-**CFG после `mem2reg`** (`while_mem2reg_cfg.png`):
+<img width="511" height="732" alt="19" src="https://github.com/user-attachments/assets/e5e1e995-2868-4298-b588-dd55bb856bc1" />
 
-```
-[entry]
-   ↓
-[header(1): phi i, phi sum, icmp, br] ←──┐
-     T ↓                  F ↓            │
-[body(3): add sum, add i, br]  [exit(6): ret sum]
-        └───────────────────────────────→┘
-```
-
-**CFG после всех оптимизаций** (`while_allpasses_cfg.png`):
-
-```
-[entry] → [header(1): br false] → [exit(13): ret 45]
-                               → [unreachable(12)]
-```
-
-Цикл полностью исчез — остался один линейный граф с возвратом константы 45.
 
 ### Задание 4. Отличие `while` от `do-while` в IR
 
